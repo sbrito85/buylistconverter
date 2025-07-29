@@ -8,7 +8,7 @@ import (
 )
 
 type MTGSets struct {
-	sets map[string]Card
+	sets map[string][]Card
 }
 
 type MTGJSONResponse struct {
@@ -31,25 +31,22 @@ type Card struct {
 
 const mtgJSONApi = "https://mtgjson.com/api/v5/%s.json"
 
-func CardKingdomUrl(cardnumber, setcode, printing string) string {
-	client := &http.Client{}
-	//u, _ := url.Parse(filepath.Join(mtgJSONApi, "FIC.json"))
-	req, err := http.NewRequest("GET", fmt.Sprintf(mtgJSONApi, setcode), nil)
-	if err != nil {
-		log.Fatal(err)
-	}
-	res, err := client.Do(req)
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer res.Body.Close()
-	var mtgjson MTGJSONResponse
-	err = json.NewDecoder(res.Body).Decode(&mtgjson)
-	if err != nil {
-		fmt.Errorf("%v", err)
-	}
+// InitMTGJSON initializes the MTGSets cache so we don't fetch mtgjson data every time.
+func InitMTGJSON() *MTGSets {
+	var mtgSets MTGSets
+	mtgSets.sets = make(map[string][]Card)
+	return &mtgSets
+}
 
-	for _, v := range mtgjson.Data.Cards {
+func (m *MTGSets) CardKingdomUrl(cardnumber, setcode, printing string) string {
+
+	if _, ok := m.sets[setcode]; !ok {
+		if err := m.FetchSet(setcode); err != nil {
+			log.Printf("Error fetching set %s: %v", setcode, err)
+			return ""
+		}
+	}
+	for _, v := range m.sets[setcode] {
 		if cardnumber == v.Number {
 			if printing == "Foil" {
 				return v.PurchaseUrls["cardKingdomFoil"]
@@ -58,4 +55,26 @@ func CardKingdomUrl(cardnumber, setcode, printing string) string {
 		}
 	}
 	return ""
+}
+
+func (m *MTGSets) FetchSet(setCode string) error {
+	client := &http.Client{}
+	fmt.Printf("Fetching MTGJSON data for set: %v\n", setCode)
+	req, err := http.NewRequest("GET", fmt.Sprintf(mtgJSONApi, setCode), nil)
+	if err != nil {
+		return err
+	}
+	res, err := client.Do(req)
+	if err != nil {
+		return err
+	}
+	defer res.Body.Close()
+	var mtgjson MTGJSONResponse
+	err = json.NewDecoder(res.Body).Decode(&mtgjson)
+	if err != nil {
+		return err
+	}
+	m.sets[setCode] = mtgjson.Data.Cards
+
+	return nil
 }

@@ -7,6 +7,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/sbrito85/buylistconverter/mtgjson"
 	"github.com/sbrito85/buylistconverter/processors"
 	"github.com/sbrito85/buylistconverter/translators"
 )
@@ -26,7 +27,7 @@ func main() {
 
 		sellList = append(sellList, processors.ProcessCSV(v)...)
 	}
-
-	ckTranslate := translators.NewCKTranslator()
+	mtgSets := mtgjson.InitMTGJSON()
+	ckTranslate := translators.NewCKTranslator(mtgSets)
 	ckTranslate.TranslateBuyList(sellList)
 }

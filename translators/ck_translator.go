@@ -6,11 +6,12 @@ import (
 	"os"
 	"time" // Import the time package
 
+	"net/http"
+
 	"github.com/PuerkitoBio/goquery"
 	"github.com/gocarina/gocsv"
 	"github.com/sbrito85/buylistconverter/mtgjson"
 	"github.com/sbrito85/buylistconverter/processors"
-	"net/http"
 )
 
 type BuyListCard struct {
@@ -24,11 +25,13 @@ type CKTranslator struct {
 	Client    *http.Client
 	RateLimit time.Duration
 	BuyList   []BuyListCard
+	MtgSets   *mtgjson.MTGSets
 }
 
-func NewCKTranslator() CKTranslator {
+func NewCKTranslator(mtgSets *mtgjson.MTGSets) CKTranslator {
 	return CKTranslator{
 		Client:    &http.Client{},
+		MtgSets:   mtgSets,
 		RateLimit: time.Second,
 	}
 }
@@ -38,9 +41,9 @@ func (c *CKTranslator) TranslateBuyList(sellList []processors.SellListItem) {
 		// Introduce a delay before each request
 		time.Sleep(c.RateLimit)
 
-		url := mtgjson.CardKingdomUrl(v.CardNumber, v.SetCode, v.Printing)
+		url := c.MtgSets.CardKingdomUrl(v.CardNumber, v.SetCode, v.Printing)
 		if url == "" {
-			fmt.Printf("Skipping %s:%s", v.Name, v.SetCode)
+			fmt.Printf("Skipping %s:%s\n", v.Name, v.SetCode)
 			continue
 		}
 		// Create a new GET request
@@ -50,7 +53,7 @@ func (c *CKTranslator) TranslateBuyList(sellList []processors.SellListItem) {
 		}
 
 		// Set a User-Agent header to mimic a web browser
-		req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+		req.Header.Set("User-Agent", "MTG Buylist Converter/1.0")
 
 		// Perform the request
 		res, err := c.Client.Do(req)
@@ -83,22 +86,20 @@ func (c *CKTranslator) TranslateBuyList(sellList []processors.SellListItem) {
 			})
 		}
 
-		if cardName != "" {
-			foil := "0"
-			if v.Printing == "Foil" {
-				foil = "1"
-			}
-			c.BuyList = append(c.BuyList, BuyListCard{
-				Title:    cardName,
-				Edition:  edition,
-				Foil:     foil,
-				Quantity: v.Quantity,
-			})
-		} else {
+		if cardName == "" {
 			fmt.Printf("%s is not being accepted for trade in\n", v.Name)
 		}
+		foil := "0"
+		if v.Printing == "Foil" {
+			foil = "1"
+		}
+		c.BuyList = append(c.BuyList, BuyListCard{
+			Title:    cardName,
+			Edition:  edition,
+			Foil:     foil,
+			Quantity: v.Quantity,
+		})
 	}
-
 	c.writeCSVToDisk()
 }
 
