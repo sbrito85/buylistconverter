@@ -32,7 +32,7 @@ func NewCKTranslator(mtgSets *mtgjson.MTGSets) CKTranslator {
 	return CKTranslator{
 		Client:    &http.Client{},
 		MtgSets:   mtgSets,
-		RateLimit: time.Second * 5,
+		RateLimit: time.Second * 3,
 	}
 }
 
