@@ -1,12 +1,13 @@
 package processors
 
 import (
-	"github.com/gocarina/gocsv"
 	"os"
+
+	"github.com/gocarina/gocsv"
 )
 
 type SellListItem struct {
-	Name       string `csv:"Simple Name"`
+	Name       string `csv:"Name"`
 	SetCode    string `csv:"Set Code"`
 	CardNumber string `csv:"Card Number"`
 	Printing   string `csv:"Printing"`

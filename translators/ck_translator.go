@@ -22,10 +22,11 @@ type BuyListCard struct {
 }
 
 type CKTranslator struct {
-	Client    *http.Client
-	RateLimit time.Duration
-	BuyList   []BuyListCard
-	MtgSets   *mtgjson.MTGSets
+	Client     *http.Client
+	RateLimit  time.Duration
+	BuyList    []BuyListCard
+	MtgSets    *mtgjson.MTGSets
+	RejectList []processors.SellListItem
 }
 
 func NewCKTranslator(mtgSets *mtgjson.MTGSets) CKTranslator {
@@ -43,14 +44,17 @@ func (c *CKTranslator) TranslateBuyList(sellList []processors.SellListItem) {
 
 		url := c.MtgSets.CardKingdomUrl(v.CardNumber, v.SetCode, v.Printing)
 		if url == "" {
+			c.RejectList = append(c.RejectList, v)
 			fmt.Printf("Skipping %s:%s\n", v.Name, v.SetCode)
 			continue
 		}
 		cardName, edition, err := c.cardInfoFromURL(url)
 		if err != nil {
+			c.RejectList = append(c.RejectList, v)
 			fmt.Printf("Error fetching card info for %s: %v\n", v.Name, edition)
 		}
 		if cardName == "" {
+			c.RejectList = append(c.RejectList, v)
 			fmt.Printf("%s is not being accepted for trade in\n", v.Name)
 		}
 		foil := "0"
@@ -69,6 +73,9 @@ func (c *CKTranslator) TranslateBuyList(sellList []processors.SellListItem) {
 	if err != nil {
 		log.Fatal(err)
 	}
+
+	fmt.Printf("%v cards added to buylist\n", len(c.BuyList))
+	fmt.Printf("%v cards added to reject list\n", len(c.RejectList))
 }
 
 func (c *CKTranslator) cardInfoFromURL(url string) (string, string, error) {
@@ -124,15 +131,27 @@ func (c *CKTranslator) cardInfoFromURL(url string) (string, string, error) {
 }
 
 func (c *CKTranslator) writeCSVToDisk() error {
-	file, err := os.OpenFile("CardKingdomBuylist.csv", os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
-	if err != nil {
-		return err
+	if len(c.BuyList) != 0 {
+		file, err := os.OpenFile("CardKingdomBuylist.csv", os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
+		if err != nil {
+			return err
+		}
+		defer file.Close()
+		err = gocsv.MarshalFile(&c.BuyList, file) // Pass a pointer to the slice
+		if err != nil {
+			return err
+		}
 	}
-	defer file.Close()
-	err = gocsv.MarshalFile(&c.BuyList, file) // Pass a pointer to the slice
-	if err != nil {
-		return err
+	if len(c.RejectList) != 0 {
+		file, err := os.OpenFile("CardKingdomRejectList.csv", os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
+		if err != nil {
+			return err
+		}
+		defer file.Close()
+		err = gocsv.MarshalFile(&c.RejectList, file) // Pass a pointer to the slice
+		if err != nil {
+			return err
+		}
 	}
-
 	return nil
 }

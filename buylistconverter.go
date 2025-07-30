@@ -27,6 +27,7 @@ func main() {
 
 		sellList = append(sellList, processors.ProcessCSV(v)...)
 	}
+	fmt.Printf("Evaluating %v cards for Card Kingdom Buylist\n", len(sellList))
 	mtgSets := mtgjson.InitMTGJSON()
 	ckTranslate := translators.NewCKTranslator(mtgSets)
 	ckTranslate.TranslateBuyList(sellList)
