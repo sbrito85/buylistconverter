@@ -32,7 +32,7 @@ func NewCKTranslator(mtgSets *mtgjson.MTGSets) CKTranslator {
 	return CKTranslator{
 		Client:    &http.Client{},
 		MtgSets:   mtgSets,
-		RateLimit: time.Second,
+		RateLimit: time.Second * 3,
 	}
 }
 
@@ -46,46 +46,10 @@ func (c *CKTranslator) TranslateBuyList(sellList []processors.SellListItem) {
 			fmt.Printf("Skipping %s:%s\n", v.Name, v.SetCode)
 			continue
 		}
-		// Create a new GET request
-		req, err := http.NewRequest("GET", url, nil)
+		cardName, edition, err := c.cardInfoFromURL(url)
 		if err != nil {
-			log.Fatal(err)
+			fmt.Printf("Error fetching card info for %s: %v\n", v.Name, edition)
 		}
-
-		// Set a User-Agent header to mimic a web browser
-		req.Header.Set("User-Agent", "MTG Buylist Converter/1.0")
-
-		// Perform the request
-		res, err := c.Client.Do(req)
-		if err != nil {
-			log.Fatal(err)
-		}
-		defer res.Body.Close()
-		//body, err := io.ReadAll(res.Body)
-		if res.StatusCode != 200 {
-			log.Fatalf("status code error: %d %s", res.StatusCode, res.Status)
-		}
-
-		// Parse the HTML using goquery
-		doc, err := goquery.NewDocumentFromReader(res.Body)
-		if err != nil {
-			log.Fatal(err)
-		}
-		// Find the edition
-		cardName := doc.Find(".sellCardName").Text()
-		edition := doc.Find(".editionLink").Text()
-		if edition == "" {
-			doc.Find("ul.breadcrumb li.breadcrumb-item a").Each(func(i int, s *goquery.Selection) {
-				linkHref, exists := s.Attr("href")
-				if exists && linkHref != "/" && linkHref != "/mtg" {
-					if len(s.Text()) > 0 {
-						edition = s.Text()
-						return
-					}
-				}
-			})
-		}
-
 		if cardName == "" {
 			fmt.Printf("%s is not being accepted for trade in\n", v.Name)
 		}
@@ -100,18 +64,74 @@ func (c *CKTranslator) TranslateBuyList(sellList []processors.SellListItem) {
 			Quantity: v.Quantity,
 		})
 	}
-	c.writeCSVToDisk()
+
+	err := c.writeCSVToDisk()
+	if err != nil {
+		log.Fatal(err)
+	}
+}
+
+func (c *CKTranslator) cardInfoFromURL(url string) (string, string, error) {
+	// Create a new GET request
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		fmt.Print("Error creating request: ", err)
+		return "", "", err
+	}
+
+	// Set a User-Agent header to mimic a web browser
+	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3")
+
+	// Perform the request
+	res, err := c.Client.Do(req)
+	if err != nil {
+		fmt.Print("Error fetching URL: ", err)
+		return "", "", err
+	}
+	if res.StatusCode == 429 {
+		fmt.Println("Rate limit exceeded, waiting for 5 minutes and trying again...")
+		time.Sleep(c.RateLimit * 360)
+		res, err = c.Client.Do(req)
+		if err != nil {
+			return "", "", err
+		}
+	}
+
+	if res.StatusCode != 200 {
+		return "", "", fmt.Errorf("status code error: %d %s", res.StatusCode, res.Status)
+	}
+	defer res.Body.Close()
+	doc, err := goquery.NewDocumentFromReader(res.Body)
+	if err != nil {
+		return "", "", err
+	}
+
+	cardName := doc.Find(".sellCardName").Text()
+	edition := doc.Find(".editionLink").Text()
+	if edition == "" {
+		doc.Find("ul.breadcrumb li.breadcrumb-item a").Each(func(i int, s *goquery.Selection) {
+			linkHref, exists := s.Attr("href")
+			if exists && linkHref != "/" && linkHref != "/mtg" {
+				if len(s.Text()) > 0 {
+					edition = s.Text()
+					return
+				}
+			}
+		})
+	}
+
+	return cardName, edition, nil
 }
 
 func (c *CKTranslator) writeCSVToDisk() error {
 	file, err := os.OpenFile("CardKingdomBuylist.csv", os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
 	if err != nil {
-		fmt.Errorf("%v", err)
+		return err
 	}
 	defer file.Close()
 	err = gocsv.MarshalFile(&c.BuyList, file) // Pass a pointer to the slice
 	if err != nil {
-		fmt.Errorf("%v", err)
+		return err
 	}
 
 	return nil
