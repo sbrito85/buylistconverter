@@ -48,7 +48,8 @@ func (m *MTGSets) CardKingdomUrl(cardnumber, setcode, printing string) string {
 	}
 	for _, v := range m.sets[setcode] {
 		if cardnumber == v.Number {
-			if printing == "Foil" {
+			// Special cards may not have a foil link.
+			if printing == "Foil" && v.PurchaseUrls["cardKingdomFoil"] != "" {
 				return v.PurchaseUrls["cardKingdomFoil"]
 			}
 			return v.PurchaseUrls["cardKingdom"]

@@ -52,10 +52,12 @@ func (c *CKTranslator) TranslateBuyList(sellList []processors.SellListItem) {
 		if err != nil {
 			c.RejectList = append(c.RejectList, v)
 			fmt.Printf("Error fetching card info for %s: %v\n", v.Name, edition)
+			continue
 		}
 		if cardName == "" {
 			c.RejectList = append(c.RejectList, v)
 			fmt.Printf("%s is not being accepted for trade in\n", v.Name)
+			continue
 		}
 		foil := "0"
 		if v.Printing == "Foil" {
