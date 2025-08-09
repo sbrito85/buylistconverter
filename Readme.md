@@ -52,5 +52,5 @@ Name | Set Code | Card Number | Printing | Quantity
 ---  | ---      | ---         | ---      |--- 
 Espers to Magicite | FIC | 114 | Foil | 1
 Summon: Fat Chocobo | FIN | 371 | Foil | 1
-"Zidane, Tantalus Thief" | FIN,405 |  | 1
+"Zidane, Tantalus Thief" | FIN |405 |  | 1
 The Masamune | FIN | 353 | Foil |1
