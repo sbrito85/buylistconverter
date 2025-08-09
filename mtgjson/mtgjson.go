@@ -8,7 +8,8 @@ import (
 )
 
 type MTGSets struct {
-	sets map[string][]Card
+	sets     map[string][]Card
+	SetNames map[string]string
 }
 
 type MTGJSONResponse struct {
@@ -16,6 +17,7 @@ type MTGJSONResponse struct {
 }
 
 type SetData struct {
+	Name  string `json:"name"`
 	Cards []Card `json:"cards"`
 }
 
@@ -26,7 +28,21 @@ type Card struct {
 	IsPromo      bool              `json:"isPromo"`
 	Name         string            `json:"name"`
 	Number       string            `json:"number"`
+	SetCode      string            `json:"setCode"`
 	PurchaseUrls map[string]string `json:"purchaseUrls"`
+	SetName      string
+	Printing     string
+}
+
+type SellCard struct {
+	ProductLine  string
+	Name         string
+	Number       string
+	SetCode      string
+	PurchaseUrls map[string]string
+	SetName      string
+	Printing     string
+	Quantity     int
 }
 
 const mtgJSONApi = "https://mtgjson.com/api/v5/%s.json"
@@ -35,6 +51,7 @@ const mtgJSONApi = "https://mtgjson.com/api/v5/%s.json"
 func InitMTGJSON() *MTGSets {
 	var mtgSets MTGSets
 	mtgSets.sets = make(map[string][]Card)
+	mtgSets.SetNames = make(map[string]string)
 	return &mtgSets
 }
 
@@ -58,6 +75,29 @@ func (m *MTGSets) CardKingdomUrl(cardnumber, setcode, printing string) string {
 	return ""
 }
 
+func (m *MTGSets) FetchSellCardInfo(cardnumber, setCode, printing string, quantity int) *SellCard {
+	if _, ok := m.sets[setCode]; !ok {
+		if err := m.FetchSet(setCode); err != nil {
+			log.Printf("Error fetching set %s: %v", setCode, err)
+			return nil
+		}
+	}
+	for _, v := range m.sets[setCode] {
+		if cardnumber == v.Number {
+			return &SellCard{
+				ProductLine: "Magic",
+				Name:        v.Name,
+				Number:      v.Number,
+				SetCode:     v.SetCode,
+				SetName:     m.SetNames[setCode],
+				Printing:    printing,
+				Quantity:    quantity,
+			}
+		}
+	}
+	return nil
+}
+
 func (m *MTGSets) FetchSet(setCode string) error {
 	client := &http.Client{}
 	fmt.Printf("Fetching MTGJSON data for set: %v\n", setCode)
@@ -76,6 +116,7 @@ func (m *MTGSets) FetchSet(setCode string) error {
 		return err
 	}
 	m.sets[setCode] = mtgjson.Data.Cards
+	m.SetNames[setCode] = mtgjson.Data.Name
 
 	return nil
 }

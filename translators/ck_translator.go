@@ -38,6 +38,7 @@ func NewCKTranslator(mtgSets *mtgjson.MTGSets) CKTranslator {
 }
 
 func (c *CKTranslator) TranslateBuyList(sellList []processors.SellListItem) {
+	fmt.Printf("Evaluating %v cards for Card Kingdom Buylist\n", len(sellList))
 	for _, v := range sellList {
 		// Introduce a delay before each request
 		time.Sleep(c.RateLimit)

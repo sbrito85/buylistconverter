@@ -15,6 +15,8 @@ import (
 func main() {
 	var sellList []processors.SellListItem
 	csvlist := flag.String("file", "TCGplayer.csv", "Path to the file TCGPlayer export")
+	ck := flag.Bool("cardkingdom", true, "Translate to CardKingdom buylist")
+	scg := flag.Bool("starcity", true, "Translate to StarCityGames buylist")
 	flag.Parse()
 	for _, v := range strings.Split(*csvlist, ",") {
 		_, err := os.Stat(v) // Attempt to get file info
@@ -27,8 +29,15 @@ func main() {
 
 		sellList = append(sellList, processors.ProcessCSV(v)...)
 	}
-	fmt.Printf("Evaluating %v cards for Card Kingdom Buylist\n", len(sellList))
+
 	mtgSets := mtgjson.InitMTGJSON()
-	ckTranslate := translators.NewCKTranslator(mtgSets)
-	ckTranslate.TranslateBuyList(sellList)
+	if *ck {
+		ckTranslate := translators.NewCKTranslator(mtgSets)
+		ckTranslate.TranslateBuyList(sellList)
+		sellList = ckTranslate.RejectList
+	}
+	if *scg {
+		scgTranslator := translators.NewSCGTranslator(mtgSets)
+		scgTranslator.TranslateBuyList(sellList)
+	}
 }
