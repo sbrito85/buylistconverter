@@ -8,8 +8,9 @@ import (
 )
 
 type MTGSets struct {
-	sets     map[string][]Card
-	SetNames map[string]string
+	SealedProducts map[string][]SealedProduct
+	sets           map[string][]Card
+	SetNames       map[string]string
 }
 
 type MTGJSONResponse struct {
@@ -125,6 +126,7 @@ func (m *MTGSets) FetchSet(setCode string) error {
 	}
 	m.sets[setCode] = mtgjson.Data.Cards
 	m.SetNames[setCode] = mtgjson.Data.Name
+	m.SealedProducts[setCode] = mtgjson.Data.SealedProducts
 
 	return nil
 }
