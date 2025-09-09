@@ -17,8 +17,16 @@ type MTGJSONResponse struct {
 }
 
 type SetData struct {
-	Name  string `json:"name"`
-	Cards []Card `json:"cards"`
+	Name           string          `json:"name"`
+	Cards          []Card          `json:"cards"`
+	SealedProducts []SealedProduct `json:"sealedProduct"`
+}
+
+type SealedProduct struct {
+	Name         string            `json:"name"`
+	SubType      string            `json:"subtype"`
+	Category     string            `json:"category"`
+	PurchaseUrls map[string]string `json:"purchaseUrls"`
 }
 
 // Card represents a single Magic: The Gathering card.
