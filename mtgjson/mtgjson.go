@@ -61,6 +61,7 @@ func InitMTGJSON() *MTGSets {
 	var mtgSets MTGSets
 	mtgSets.sets = make(map[string][]Card)
 	mtgSets.SetNames = make(map[string]string)
+	mtgSets.SealedProducts = make(map[string][]SealedProduct)
 	return &mtgSets
 }
 
