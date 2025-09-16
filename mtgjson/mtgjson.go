@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"strings"
 )
 
 type MTGSets struct {
@@ -76,7 +77,7 @@ func (m *MTGSets) CardKingdomUrl(cardnumber, setcode, printing string) string {
 	for _, v := range m.sets[setcode] {
 		if cardnumber == v.Number {
 			// Special cards may not have a foil link.
-			if printing == "Foil" && v.PurchaseUrls["cardKingdomFoil"] != "" {
+			if strings.EqualFold(printing, "Foil") && v.PurchaseUrls["cardKingdomFoil"] != "" {
 				return v.PurchaseUrls["cardKingdomFoil"]
 			}
 			return v.PurchaseUrls["cardKingdom"]
