@@ -40,6 +40,7 @@ type Card struct {
 	Number       string            `json:"number"`
 	SetCode      string            `json:"setCode"`
 	PurchaseUrls map[string]string `json:"purchaseUrls"`
+	Identifiers  map[string]string `json:"identifiers"`
 	SetName      string
 	Printing     string
 }
@@ -53,6 +54,7 @@ type SellCard struct {
 	SetName      string
 	Printing     string
 	Quantity     int
+	ScryfallId   string
 }
 
 const mtgJSONApi = "https://mtgjson.com/api/v5/%s.json"
@@ -64,6 +66,21 @@ func InitMTGJSON() *MTGSets {
 	mtgSets.SetNames = make(map[string]string)
 	mtgSets.SealedProducts = make(map[string][]SealedProduct)
 	return &mtgSets
+}
+
+func (m *MTGSets) GetScryfallid(cardnumber, setCode, printing string) string {
+	if _, ok := m.sets[setCode]; !ok {
+		if err := m.FetchSet(setCode); err != nil {
+			log.Printf("Error fetching set %s: %v", setCode, err)
+			return ""
+		}
+	}
+	for _, v := range m.sets[setCode] {
+		if cardnumber == v.Number {
+			return v.Identifiers["scryfallId"]
+		}
+	}
+	return ""
 }
 
 func (m *MTGSets) CardKingdomUrl(cardnumber, setcode, printing string) string {
@@ -111,7 +128,7 @@ func (m *MTGSets) FetchSellCardInfo(cardnumber, setCode, printing string, quanti
 
 func (m *MTGSets) FetchSet(setCode string) error {
 	client := &http.Client{}
-	fmt.Printf("Fetching MTGJSON data for set: %v\n", setCode)
+	//fmt.Printf("Fetching MTGJSON data for set: %v\n", setCode)
 	req, err := http.NewRequest("GET", fmt.Sprintf(mtgJSONApi, setCode), nil)
 	if err != nil {
 		return err

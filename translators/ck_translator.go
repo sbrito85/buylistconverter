@@ -1,6 +1,7 @@
 package translators
 
 import (
+	"encoding/json"
 	"fmt"
 	"log"
 	"os"
@@ -29,6 +30,20 @@ type CKTranslator struct {
 	RejectList []processors.SellListItem
 }
 
+type CKPriceListResponse struct {
+	Data []Item `json:"data"`
+}
+
+type Item struct {
+	Scryfall_id string `json:"scryfall_id"`
+	IsFoil      string `json:"is_foil"`
+	QtyBuying   int    `json:"qty_buying"`
+	PriceBuy    string `json:"price_buy"`
+	Name        string `json:"name"`
+	Edition     string `json:"edition"`
+	Variation string `json:"variation"`
+}
+
 func NewCKTranslator(mtgSets *mtgjson.MTGSets) CKTranslator {
 	return CKTranslator{
 		Client:    &http.Client{},
@@ -37,48 +52,79 @@ func NewCKTranslator(mtgSets *mtgjson.MTGSets) CKTranslator {
 	}
 }
 
+const ckAPI = "https://api.cardkingdom.com/api/v2/pricelist"
+
 func (c *CKTranslator) TranslateBuyList(sellList []processors.SellListItem) {
 	fmt.Printf("Evaluating %v cards for Card Kingdom Buylist\n", len(sellList))
+	var priceList []Item
+	priceList, err := c.ckPriceList()
+	if err != nil {
+		fmt.Printf("Error fetching Card Kingdom price list: %v\n", err)
+		return
+	}
 	for _, v := range sellList {
 		// Introduce a delay before each request
-		time.Sleep(c.RateLimit)
+		for _, card := range priceList {
+			scryfallId := c.MtgSets.GetScryfallid(v.CardNumber, v.SetCode, v.Printing)
+			if scryfallId == "" {
+				continue
+			}
+			if card.Scryfall_id == scryfallId && checkPrinting(v.Printing) == card.IsFoil && card.QtyBuying > 0 {
+				fmt.Printf("Accepting %s(%s) qty:%d at %s\n", card.Name, v.SetCode, card.QtyBuying, card.PriceBuy)
+				foil := "0"
+				if v.Printing == "Foil" {
+					foil = "1"
+				}
 
-		url := c.MtgSets.CardKingdomUrl(v.CardNumber, v.SetCode, v.Printing)
-		if url == "" {
-			c.RejectList = append(c.RejectList, v)
-			fmt.Printf("Skipping %s:%s\n", v.Name, v.SetCode)
-			continue
+				name := card.Name
+				if card.Variation != "" {
+					name = fmt.Sprintf("%s (%s)", card.Name, card.Variation )
+				}
+				c.BuyList = append(c.BuyList, BuyListCard{
+					Title:    name,
+					Edition:  card.Edition,
+					Foil:     foil,
+					Quantity: v.Quantity,
+				})
+				continue
+			}
 		}
-		cardName, edition, err := c.cardInfoFromURL(url)
-		if err != nil {
-			c.RejectList = append(c.RejectList, v)
-			fmt.Printf("Error fetching card info for %s: %v\n", v.Name, edition)
-			continue
-		}
-		if cardName == "" {
-			c.RejectList = append(c.RejectList, v)
-			fmt.Printf("%s is not being accepted for trade in\n", v.Name)
-			continue
-		}
-		foil := "0"
-		if v.Printing == "Foil" {
-			foil = "1"
-		}
-		c.BuyList = append(c.BuyList, BuyListCard{
-			Title:    cardName,
-			Edition:  edition,
-			Foil:     foil,
-			Quantity: v.Quantity,
-		})
+		c.RejectList = append(c.RejectList, v)
 	}
 
-	err := c.writeCSVToDisk()
+	err = c.writeCSVToDisk()
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	fmt.Printf("%v cards added to buylist\n", len(c.BuyList))
 	fmt.Printf("%v cards added to reject list\n", len(c.RejectList))
+}
+
+func checkPrinting(printing string) string {
+	if printing == "Foil" {
+		return "true"
+	}
+	return "false"
+}
+
+func (c *CKTranslator) ckPriceList() ([]Item, error) {
+	fmt.Printf("Fetching Card Kingdom price list\n")
+	req, err := http.NewRequest("GET", ckAPI, nil)
+	if err != nil {
+		return nil, err
+	}
+	res, err := c.Client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer res.Body.Close()
+	var ckprices CKPriceListResponse
+	err = json.NewDecoder(res.Body).Decode(&ckprices)
+	if err != nil {
+		return nil, err
+	}
+	return ckprices.Data, nil
 }
 
 func (c *CKTranslator) cardInfoFromURL(url string) (string, string, error) {
